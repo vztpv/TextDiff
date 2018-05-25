@@ -6,6 +6,23 @@
 #include <vector>
 #include <algorithm>
 
+#define ENTER "\n"
+
+inline bool isWhiteSpace(char ch)
+{
+	switch(ch)
+	{
+	case ' ':
+	case '\t':
+	case '\r':
+	case '\n':
+	case '\v':
+	case '\f':
+		return true;
+		break;
+	}
+	return false;
+}
 class C_STR_INFO
 {
 public:
@@ -111,7 +128,12 @@ void printDiff(std::vector<DIFF_INFO>& diff_info, const std::vector<std::vector<
 			diff_info.back().len++;
 		}
 		else {
-			diff_info.push_back(DIFF_INFO(DIFF_INFO::TYPE::SAME, x.str + i - 1, 1));
+			if (isWhiteSpace(x.str[i - 1])) {
+				//
+			}
+			else {
+				diff_info.push_back(DIFF_INFO(DIFF_INFO::TYPE::SAME, x.str + i - 1, 1));
+			}
 		}
 	}
 	else if (j > 0 && (i == 0 || c[i][j - 1] >= c[i - 1][j])) {
@@ -121,7 +143,12 @@ void printDiff(std::vector<DIFF_INFO>& diff_info, const std::vector<std::vector<
 			diff_info.back().len++;
 		}
 		else {
-			diff_info.push_back(DIFF_INFO(DIFF_INFO::TYPE::ADDITION, y.str + j - 1, 1));
+			if (isWhiteSpace(y.str[j - 1])) {
+				//
+			}
+			else {
+				diff_info.push_back(DIFF_INFO(DIFF_INFO::TYPE::ADDITION, y.str + j - 1, 1));
+			}
 		}
 	}
 	else if (i > 0 && (j == 0 || c[i][j - 1] < c[i - 1][j])) {
@@ -131,7 +158,12 @@ void printDiff(std::vector<DIFF_INFO>& diff_info, const std::vector<std::vector<
 			diff_info.back().len++;
 		}
 		else {
-			diff_info.push_back(DIFF_INFO(DIFF_INFO::TYPE::REMOVAL, x.str + i - 1, 1));
+			if (isWhiteSpace(x.str[i - 1])) {
+				//
+			}
+			else {
+				diff_info.push_back(DIFF_INFO(DIFF_INFO::TYPE::REMOVAL, x.str + i - 1, 1));
+			}
 		}
 	}
 }
@@ -147,46 +179,202 @@ inline std::vector<DIFF_INFO> GetDiff(char* before, int before_len, char* now, i
 	return diff_info;
 }
 
+void Do(std::vector<DIFF_INFO>& diff_info, std::ifstream& beforeFile, std::ifstream& nowFile, char*& beforeBuffer, char*& nowBuffer)
+{
+	long long _beforeLen;
+	long long _nowLen;
+	char emptyBuffer[] = "";
 
+	{
+		beforeFile.seekg(0, beforeFile.end);
+		long long length = beforeFile.tellg();
+		beforeFile.seekg(0, beforeFile.beg);
+
+		beforeBuffer = new char[length + 1]; // 
+
+									   // read data as a block:
+		beforeFile.read(beforeBuffer, length);
+		beforeFile.seekg(0, beforeFile.end);
+		char temp;
+		beforeFile >> temp;
+
+		beforeBuffer[length] = '\0';
+
+		_beforeLen = length;
+	}
+	{
+		nowFile.seekg(0, nowFile.end);
+		long long length = nowFile.tellg();
+		nowFile.seekg(0, nowFile.beg);
+
+		nowBuffer = new char[length + 1]; // 
+
+											 // read data as a block:
+		nowFile.read(nowBuffer, length);
+		nowFile.seekg(0, nowFile.end);
+		char temp;
+		nowFile >> temp;
+
+		nowBuffer[length] = '\0';
+
+		_nowLen = length;
+	}
+	{
+		char* before = beforeBuffer;
+		char* now = nowBuffer;
+		long long beforeLen = 0; // beforeTokenLen
+		long long nowLen = 0; // nowTokenLen
+		long long beforeEnterPos = -1, nowEnterPos = -1;
+		long long i = 0, j = 0;
+
+		while (i < _beforeLen || j < _nowLen) {
+			if (i >= _beforeLen) {
+				before = emptyBuffer;
+				beforeLen = 0;
+			}
+			else {
+				for (long long k = i; k < _beforeLen; ++k) {
+					if (beforeBuffer[k] == '\n') {
+						i = k;
+						break;
+					}
+					else if (k == _beforeLen - 1) {
+						i = k;
+					}
+				}
+
+				beforeLen = i - beforeEnterPos - 1;
+				for (long long k = i - 1; k > beforeEnterPos; --k) {
+					if (!isWhiteSpace(beforeBuffer[k])) {
+						break;
+					}
+					else {
+						beforeLen--;
+					}
+				}
+				if (beforeLen > 0) {
+					for (long long k = beforeEnterPos + 1; k <= i - 1; ++k) {
+						if (!isWhiteSpace(beforeBuffer[k])) {
+							break;
+						}
+						else {
+							beforeLen--;
+							before++;
+						}
+					}
+				}
+				beforeEnterPos = i;
+			}
+			if (j >= _nowLen) {
+				now = emptyBuffer;
+				nowLen = 0;
+			}
+			else {
+				for (long long k = i; k < _nowLen; ++k) {
+					if (nowBuffer[k] == '\n') {
+						j = k;
+						break;
+					}
+					else if (k == _nowLen - 1) {
+						j = k;
+					}
+				}
+
+				nowLen = j - nowEnterPos - 1;
+
+				for (long long k = j - 1; k > nowEnterPos; --k) {
+					if (!isWhiteSpace(nowBuffer[k])) {
+						break;
+					}
+					else {
+						nowLen--;
+					}
+				}
+				if (nowLen > 0) {
+					for (long long k = nowEnterPos + 1; k <= j - 1; ++k) {
+						if (!isWhiteSpace(nowBuffer[k])) {
+							break;
+						}
+						else {
+							nowLen--;
+							now++;
+						}
+					}
+				}
+				nowEnterPos = j;
+			}
+
+			const int before_size = beforeLen;
+			const int now_size = nowLen;
+
+			if (before_size == 0 && now_size == 0) {
+				break;
+			}
+
+			std::vector<DIFF_INFO> temp = GetDiff(before, before_size, now, now_size);
+			static char empty[] = "";
+	
+			diff_info.insert(diff_info.begin() + diff_info.size(), std::make_move_iterator(temp.begin()), std::make_move_iterator(temp.end()));
+			diff_info.push_back(DIFF_INFO(DIFF_INFO::TYPE::EOL, empty, 0));
+
+			// debug
+			//std::cout << C_STR_INFO(before, before_size) << std::endl;
+			//std::cout << C_STR_INFO(now, now_size) << std::endl;
+
+			before = before + i + 1;
+			now = now + j + 1;
+			++i;
+			++j;
+		}
+	}
+}
+
+// for ansi file..
 int main(int argc, char* argv[])
 {
-	char before[] = "printDiff(diff_info, c, x, y, x.len, y.len);";
-	char now[] = "printDiff2(diff_info, cd, xz, yk, x.len, y.len):";
+	if (argc == 3) {
+		std::ifstream beforeFile(argv[1], std::ios::binary);
+		std::ifstream nowFile(argv[2], std::ios::binary);
+		std::ofstream outFile("test.txt");
 
-	const int before_size = std::strlen(before);
-	
-	const int now_size = std::strlen(now);
-	const int before_start = 0, now_start = 0;
-	std::vector<DIFF_INFO> diff_info;
+		if (!beforeFile || !nowFile) { beforeFile.close(); nowFile.close(); return 1; }
+		
 
-	std::vector<DIFF_INFO> temp = GetDiff(before + before_start, before_size, now + now_start, now_size);
-	diff_info.insert(diff_info.begin() + diff_info.size(), std::make_move_iterator(temp.begin()), std::make_move_iterator(temp.end()));
-	
+		std::vector<DIFF_INFO> diff_info;
 
-	std::cout << before << std::endl;
-	std::cout << now << std::endl;
+		char* beforeBuffer = nullptr;
+		char* nowBuffer = nullptr;
 
-	for (int i = 0; i < diff_info.size(); ++i) {
-		switch (diff_info[i].type)
-		{
+		Do(diff_info, beforeFile, nowFile, beforeBuffer, nowBuffer);
+
+		beforeFile.close();
+		nowFile.close();
+		
+		for (int i = 0; i < diff_info.size(); ++i) {
+			switch (diff_info[i].type)
+			{
 			case DIFF_INFO::TYPE::SAME:
-				std::cout << "SAME : " << C_STR_INFO(diff_info[i].str, diff_info[i].len) << std::endl;
+				outFile << "SAME : " << C_STR_INFO(diff_info[i].str, diff_info[i].len) << ENTER;
 				break;
 
 			case DIFF_INFO::TYPE::ADDITION:
-				std::cout << "ADDITION : " << C_STR_INFO(diff_info[i].str, diff_info[i].len) << std::endl;
+				outFile << "ADDITION : " << C_STR_INFO(diff_info[i].str, diff_info[i].len) << ENTER;
 				break;
 
 			case DIFF_INFO::TYPE::REMOVAL:
-				std::cout << "REMOVAL : " << C_STR_INFO(diff_info[i].str, diff_info[i].len) << std::endl;
+				outFile  << "REMOVAL : " << C_STR_INFO(diff_info[i].str, diff_info[i].len) << ENTER;
 				break;
 
 			case DIFF_INFO::TYPE::EOL:
-				std::cout << std::endl;
+				outFile << std::endl;
 				break;
+			}
 		}
-	}
 
+		outFile.close();
+		delete[] beforeBuffer;
+		delete[] nowBuffer;
+	}
 
 	return 0;
 }
