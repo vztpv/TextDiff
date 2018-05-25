@@ -18,6 +18,7 @@ inline bool isWhiteSpace(char ch)
 	case '\n':
 	case '\v':
 	case '\f':
+	case '\0':
 		return true;
 		break;
 	}
@@ -44,7 +45,7 @@ public:
 
 	friend std::ostream& operator<<(std::ostream& stream, const C_STR_INFO& info) {
 		for (int i = 0; i < info.len; ++i) {
-			std::cout << info.str[i];
+			stream << info.str[i];
 		}
 		return stream;
 	}
@@ -234,12 +235,12 @@ void Do(std::vector<DIFF_INFO>& diff_info, std::ifstream& beforeFile, std::ifstr
 			}
 			else {
 				for (long long k = i; k < _beforeLen; ++k) {
-					if (beforeBuffer[k] == '\n') {
+					if (beforeBuffer[k] == '\n' || beforeBuffer[k] == '\0') {
 						i = k;
 						break;
 					}
 					else if (k == _beforeLen - 1) {
-						i = k;
+						i = k + 1;
 					}
 				}
 
@@ -270,13 +271,13 @@ void Do(std::vector<DIFF_INFO>& diff_info, std::ifstream& beforeFile, std::ifstr
 				nowLen = 0;
 			}
 			else {
-				for (long long k = i; k < _nowLen; ++k) {
-					if (nowBuffer[k] == '\n') {
+				for (long long k = j; k < _nowLen; ++k) {
+					if (nowBuffer[k] == '\n' || beforeBuffer[k] == '\0') {
 						j = k;
 						break;
 					}
 					else if (k == _nowLen - 1) {
-						j = k;
+						j = k + 1;
 					}
 				}
 
@@ -308,7 +309,12 @@ void Do(std::vector<DIFF_INFO>& diff_info, std::ifstream& beforeFile, std::ifstr
 			const int now_size = nowLen;
 
 			if (before_size == 0 && now_size == 0) {
-				break;
+				before = beforeBuffer + i + 1;
+				now = nowBuffer + j + 1;
+				++i;
+				++j;
+
+				continue;
 			}
 
 			std::vector<DIFF_INFO> temp = GetDiff(before, before_size, now, now_size);
@@ -321,8 +327,8 @@ void Do(std::vector<DIFF_INFO>& diff_info, std::ifstream& beforeFile, std::ifstr
 			//std::cout << C_STR_INFO(before, before_size) << std::endl;
 			//std::cout << C_STR_INFO(now, now_size) << std::endl;
 
-			before = before + i + 1;
-			now = now + j + 1;
+			before = beforeBuffer + i + 1;
+			now = nowBuffer + j + 1;
 			++i;
 			++j;
 		}
@@ -337,8 +343,13 @@ int main(int argc, char* argv[])
 		std::ifstream nowFile(argv[2], std::ios::binary);
 		std::ofstream outFile("test.txt");
 
-		if (!beforeFile || !nowFile) { beforeFile.close(); nowFile.close(); return 1; }
-		
+
+		if (!beforeFile || !nowFile) { outFile.close();  beforeFile.close(); nowFile.close(); return 1; }
+
+		if (!outFile) {
+			beforeFile.close(); nowFile.close();
+			outFile.close();
+		}
 
 		std::vector<DIFF_INFO> diff_info;
 
@@ -366,7 +377,7 @@ int main(int argc, char* argv[])
 				break;
 
 			case DIFF_INFO::TYPE::EOL:
-				outFile << std::endl;
+				outFile << ENTER;
 				break;
 			}
 		}
